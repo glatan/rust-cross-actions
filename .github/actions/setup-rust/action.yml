@@ -1,0 +1,33 @@
+name: "Setup Rust"
+description: "Setup Rust environment with specified target and components"
+
+inputs:
+  toolchain:
+    required: true
+    description: "Toolchain version for Rust environment"
+  target:
+    required: true
+    description: "Target architecture for Rust environment"
+  msys2:
+    required: false
+    description: "MSYS2 packages to install"
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Initialize MSYS2 rustup
+      if: runner.os == 'Windows' && inputs.msys2 == 'true'
+      shell: msys2 {0}
+      run: |
+        rustup-init -y --default-toolchain ${{ inputs.toolchain }} --target ${{ inputs.target }}
+    # v1
+    - uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
+      if: runner.os != 'Windows' && inputs.msys2 != 'true'
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        targets: ${{ inputs.target }}
+    # v2.8.2
+    - uses: swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5
+      with:
+        key: ${{ inputs.toolchain }}-${{ inputs.target }}
