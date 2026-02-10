@@ -9,9 +9,12 @@ on:
         required: true
 
 jobs:
-  lint-and-check:
-    runs-on: ubuntu-latest
+  check-format-and-lint:
+    runs-on: ubuntu-24.04
     steps:
+      # v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        name: Checkout
       - uses: ./.github/actions/setup-rust
         with:
           toolchain: ${{ inputs.rust-version }}
@@ -22,6 +25,7 @@ jobs:
           cargo clippy --workspace -F all
 
   test:
+    needs: [check-format-and-lint]
     name: Test (${{ matrix.target }})
     runs-on: ${{ matrix.os || 'ubuntu-24.04' }}
     continue-on-error: ${{ matrix.nightly || false }}
@@ -121,8 +125,15 @@ jobs:
             apt: [gcc-riscv64-linux-gnu]
             linker: riscv64-linux-gnu-gcc
             runner: "qemu-riscv64 -L /usr/riscv64-linux-gnu/"
-          - target: wasm32-wasi
+          - target: wasm32-wasip1
             wasm: true
+            runner: "wasmtime run --dir /::."
+          - target: wasm32-wasip1-threads
+            wasm: true
+            runner: "wasmtime run --dir /::."
+          - target: wasm32-wasip2
+            wasm: true
+            runner: "wasmtime run --dir /::. --wasi threads"
 
           # --- Tier 3: Experimental ---
           - target: mips64el-unknown-linux-gnuabi64
@@ -179,7 +190,7 @@ jobs:
           version: ${{ inputs.wasmtime-version }}
 
       - name: Configure Cargo
-        if: matrix.os == 'Linux'
+        if: runner.os == 'Linux'
         run: |
           T_UPPER=$(echo "${{ matrix.target }}" | tr '[:lower:]-' '[:upper:]_')
           if [[ -n "${{ matrix.linker }}" ]]; then
@@ -198,4 +209,8 @@ jobs:
         if: runner.os != 'Windows' && matrix.msys2 != 'true'
         shell: bash
         run: |
-          cargo test --workspace --target "${{ matrix.target }}"
+          if [[ -z "${{ matrix.nightly }}" ]]; then
+            cargo test --workspace --target "${{ matrix.target }}" -Z build-std
+          else
+            cargo test --workspace --target "${{ matrix.target }}"
+          fi

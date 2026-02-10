@@ -6,7 +6,7 @@ inputs:
     required: true
     description: "Toolchain version for Rust environment"
   target:
-    required: true
+    required: false
     description: "Target architecture for Rust environment"
   msys2:
     required: false
@@ -16,17 +16,31 @@ inputs:
 runs:
   using: "composite"
   steps:
+    # v1
+    - uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
+      name: Install rustup
+      if: runner.os != 'Windows' && inputs.msys2 != 'true'
+      with:
+        toolchain: ${{ inputs.toolchain }}
+
     - name: Initialize MSYS2 rustup
       if: runner.os == 'Windows' && inputs.msys2 == 'true'
       shell: msys2 {0}
       run: |
-        rustup-init -y --default-toolchain ${{ inputs.toolchain }} --target ${{ inputs.target }}
-    # v1
-    - uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
+        rustup set profile minimal
+        rustup default ${{ inputs.toolchain }}
+        rustup target add ${{ inputs.target }}
+
+    - name: Install components
       if: runner.os != 'Windows' && inputs.msys2 != 'true'
-      with:
-        toolchain: ${{ inputs.toolchain }}
-        targets: ${{ inputs.target }}
+      shell: bash
+      run: |
+        if [[ ${{ inputs.toolchain }} != 'nightly' ]]; then
+          rustup target add ${{ inputs.target }}
+        else
+          rustup component add rust-src
+        fi
+
     # v2.8.2
     - uses: swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5
       with:
