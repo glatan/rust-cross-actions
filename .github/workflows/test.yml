@@ -20,7 +20,7 @@ jobs:
           toolchain: ${{ inputs.rust-version }}
           target: x86_64-unknown-linux-gnu
       - run: |
-          rustup component add clippy fmt
+          rustup component add clippy rustfmt
           cargo fmt --check --all
           cargo clippy --workspace -F all
 
