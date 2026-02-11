@@ -22,7 +22,7 @@ jobs:
       - run: |
           rustup component add clippy rustfmt
           cargo fmt --check --all
-          cargo clippy --workspace -F all
+          cargo clippy --workspace
 
   test:
     needs: [check-format-and-lint]
@@ -210,7 +210,7 @@ jobs:
         shell: bash
         run: |
           if [[ -z "${{ matrix.nightly }}" ]]; then
-            cargo test --workspace --target "${{ matrix.target }}" -Z build-std
+            cargo test --workspace --target "${{ matrix.target }}" --all-features -Z build-std
           else
-            cargo test --workspace --target "${{ matrix.target }}"
+            cargo test --workspace --target "${{ matrix.target }}" --all-features
           fi
