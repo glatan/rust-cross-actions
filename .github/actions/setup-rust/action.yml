@@ -11,7 +11,6 @@ inputs:
   msys2:
     required: false
     description: "MSYS2 packages to install"
-    default: "false"
 
 runs:
   using: "composite"

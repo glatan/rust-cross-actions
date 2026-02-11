@@ -21,7 +21,7 @@ jobs:
           target: x86_64-unknown-linux-gnu
       - run: |
           rustup component add clippy rustfmt
-          cargo fmt --check --all
+          cargo fmt --check
           cargo clippy --workspace
 
   test:
@@ -50,7 +50,7 @@ jobs:
             os: windows-2025
             msys2: true
             msys2-packages: [
-              "mingw-w64-rustup",
+              "mingw-w64-ucrt-x86_64-rustup",
             ]
             msys_env: MINGW64
 
@@ -87,28 +87,30 @@ jobs:
             os: windows-2025
             msys2: true
             msys2-packages: [
-              "mingw-w64-rustup",
+              "mingw-w64-ucrt-x86_64-rustup",
+              "mingw-w64-i686-gcc",
             ]
             msys_env: MINGW64
           - target: i686-pc-windows-gnullvm
             os: windows-2025
             msys2: true
             msys2-packages: [
-              "mingw-w64-rustup",
+              "mingw-w64-clang-x86_64-rustup",
+              "mingw-w64-i686-clang",
             ]
             msys_env: CLANG64
           - target: x86_64-pc-windows-gnullvm
             os: windows-2025
             msys2: true
             msys2-packages: [
-              "mingw-w64-rustup",
+              "mingw-w64-clang-x86_64-rustup",
             ]
             msys_env: CLANG64
           - target: aarch64-pc-windows-gnullvm
             os: windows-2025
             msys2: true
             msys2-packages: [
-              "mingw-w64-rustup",
+              "mingw-w64-clang-aarch64-rustup",
             ]
             msys_env: CLANGARM64
 
@@ -130,10 +132,10 @@ jobs:
             runner: "wasmtime run --dir /::."
           - target: wasm32-wasip1-threads
             wasm: true
-            runner: "wasmtime run --dir /::."
+            runner: "wasmtime run --dir /::. --wasi threads"
           - target: wasm32-wasip2
             wasm: true
-            runner: "wasmtime run --dir /::. --wasi threads"
+            runner: "wasmtime run --dir /::."
 
           # --- Tier 3: Experimental ---
           - target: mips64el-unknown-linux-gnuabi64
@@ -143,7 +145,7 @@ jobs:
             nightly: true
           - target: mipsel-unknown-linux-gnu
             apt: [gcc-mipsel-linux-gnu]
-            linker: mipsel-unknown-linux-gnu-gcc
+            linker: mipsel-linux-gnu-gcc
             runner: "qemu-mipsel -L /usr/mipsel-unknown-linux-gnu/"
             nightly: true
           - target: sparc64-unknown-linux-gnu
@@ -162,10 +164,10 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         name: Checkout
 
-      - name: Setup MSYS2
-        if: runner.os == 'Windows' && matrix.msys2 == 'true'
-        # v2.3.0
-        uses: msys2/setup-msys2@4f806de0a5a7294ffabaff804b38a9b435a73bda
+      # v2.3.0
+      - uses: msys2/setup-msys2@4f806de0a5a7294ffabaff804b38a9b435a73bda
+        name: Setup MSYS2
+        if: runner.os == 'Windows' && matrix.msys2 == true
         with:
           msystem: ${{ matrix.msys_env }}
           install: ${{ join(matrix.msys2-packages, ' ') }}
@@ -182,10 +184,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qemu-user ${{ join(matrix.apt, ' ') }}
 
-      - name: Setup WASM Runtime
-        if: matrix.wasm == true
         # v1.1.0
-        uses: bytecodealliance/actions/wasmtime/setup@d742827944dcb656569399571a8a45261b5089f6
+      - uses: bytecodealliance/actions/wasmtime/setup@d742827944dcb656569399571a8a45261b5089f6
+        name: Setup WASM Runtime
+        if: matrix.wasm == true
         with:
           version: ${{ inputs.wasmtime-version }}
 
@@ -201,16 +203,16 @@ jobs:
           fi
 
       - name: Run Test
-        if: runner.os == 'Windows' && matrix.msys2 == 'true'
+        if: runner.os == 'Windows' && matrix.msys2 == true
         shell: msys2 {0}
         run: cargo test --workspace --target "${{ matrix.target }}"
 
       - name: Run Test
-        if: runner.os != 'Windows' && matrix.msys2 != 'true'
+        if: runner.os != 'Windows' && matrix.msys2 != true
         shell: bash
         run: |
           if [[ -z "${{ matrix.nightly }}" ]]; then
-            cargo test --workspace --target "${{ matrix.target }}" --all-features -Z build-std
-          else
             cargo test --workspace --target "${{ matrix.target }}" --all-features
+          else
+            cargo test --workspace --target "${{ matrix.target }}" --all-features -Z build-std
           fi
