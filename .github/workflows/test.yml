@@ -1,0 +1,218 @@
+on:
+  workflow_call:
+    inputs:
+      rust-version:
+        type: string
+        required: true
+      wasmtime-version:
+        type: string
+        required: true
+
+jobs:
+  check-format-and-lint:
+    runs-on: ubuntu-24.04
+    steps:
+      # v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        name: Checkout
+      - uses: ./.github/actions/setup-rust
+        with:
+          toolchain: ${{ inputs.rust-version }}
+          target: x86_64-unknown-linux-gnu
+      - run: |
+          rustup component add clippy rustfmt
+          cargo fmt --check
+          cargo clippy --workspace
+
+  test:
+    needs: [check-format-and-lint]
+    name: Test (${{ matrix.target }})
+    runs-on: ${{ matrix.os || 'ubuntu-24.04' }}
+    continue-on-error: ${{ matrix.nightly || false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # --- Tier 1 ---
+          - target: x86_64-unknown-linux-gnu
+            apt: [gcc]
+          - target: i686-unknown-linux-gnu
+            apt: [gcc-i686-linux-gnu]
+            linker: i686-linux-gnu-gcc
+            runner: "qemu-i386 -L /usr/i686-linux-gnu/"
+          - target: aarch64-apple-darwin
+            os: macos-15
+          - target: x86_64-pc-windows-msvc
+            os: windows-2025
+          - target: i686-pc-windows-msvc
+            os: windows-2025
+          - target: x86_64-pc-windows-gnu
+            os: windows-2025
+            msys2: true
+            msys2-packages: [
+              "mingw-w64-ucrt-x86_64-rustup",
+            ]
+            msys_env: MINGW64
+
+          # --- Tier 2: With Host Tools ---
+          - target: aarch64-unknown-linux-gnu
+            apt: [gcc-aarch64-linux-gnu]
+            linker: aarch64-linux-gnu-gcc
+            runner: "qemu-aarch64 -L /usr/aarch64-linux-gnu/"
+          - target: arm-unknown-linux-gnueabi
+            apt: [gcc-arm-linux-gnueabi]
+            linker: arm-linux-gnueabi-gcc
+            runner: "qemu-arm -L /usr/arm-linux-gnueabi/"
+          - target: arm-unknown-linux-gnueabihf
+            apt: [gcc-arm-linux-gnueabihf]
+            linker: arm-linux-gnueabihf-gcc
+            runner: "qemu-arm -L /usr/arm-linux-gnueabihf/"
+          - target: armv7-unknown-linux-gnueabihf
+            apt: [gcc-arm-linux-gnueabihf]
+            linker: arm-linux-gnueabihf-gcc
+            runner: "qemu-arm -L /usr/arm-linux-gnueabihf/"
+          - target: powerpc64le-unknown-linux-gnu
+            apt: [gcc-powerpc64le-linux-gnu]
+            linker: powerpc64le-linux-gnu-gcc
+            runner: "qemu-ppc64le -L /usr/powerpc64le-linux-gnu/"
+          - target: s390x-unknown-linux-gnu
+            apt: [gcc-s390x-linux-gnu]
+            linker: s390x-linux-gnu-gcc
+            runner: "qemu-s390x -L /usr/s390x-linux-gnu/"
+          - target: x86_64-unknown-linux-musl
+            apt: [musl-tools]
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+          - target: i686-pc-windows-gnu
+            os: windows-2025
+            msys2: true
+            msys2-packages: [
+              "mingw-w64-ucrt-x86_64-rustup",
+              "mingw-w64-i686-gcc",
+            ]
+            msys_env: MINGW64
+          - target: i686-pc-windows-gnullvm
+            os: windows-2025
+            msys2: true
+            msys2-packages: [
+              "mingw-w64-clang-x86_64-rustup",
+              "mingw-w64-i686-clang",
+            ]
+            msys_env: CLANG64
+          - target: x86_64-pc-windows-gnullvm
+            os: windows-2025
+            msys2: true
+            msys2-packages: [
+              "mingw-w64-clang-x86_64-rustup",
+            ]
+            msys_env: CLANG64
+          - target: aarch64-pc-windows-gnullvm
+            os: windows-2025
+            msys2: true
+            msys2-packages: [
+              "mingw-w64-clang-aarch64-rustup",
+            ]
+            msys_env: CLANGARM64
+
+          # --- Tier 2: Without Host Tools ---
+          - target: i686-unknown-linux-musl
+            apt: [gcc-i686-linux-gnu, musl-tools]
+            linker: i686-linux-gnu-gcc
+            runner: "qemu-i386"
+          - target: aarch64-unknown-linux-musl
+            apt: [gcc-aarch64-linux-gnu, musl-tools]
+            linker: aarch64-linux-gnu-gcc
+            runner: "qemu-aarch64"
+          - target: riscv64gc-unknown-linux-gnu
+            apt: [gcc-riscv64-linux-gnu]
+            linker: riscv64-linux-gnu-gcc
+            runner: "qemu-riscv64 -L /usr/riscv64-linux-gnu/"
+          - target: wasm32-wasip1
+            wasm: true
+            runner: "wasmtime run --dir /::."
+          - target: wasm32-wasip1-threads
+            wasm: true
+            runner: "wasmtime run --dir /::. --wasi threads"
+          - target: wasm32-wasip2
+            wasm: true
+            runner: "wasmtime run --dir /::."
+
+          # --- Tier 3: Experimental ---
+          - target: mips64el-unknown-linux-gnuabi64
+            apt: [gcc-mips64el-linux-gnuabi64]
+            linker: mips64el-linux-gnuabi64-gcc
+            runner: "qemu-mips64el -L /usr/mips64el-linux-gnuabi64/"
+            nightly: true
+          - target: mipsel-unknown-linux-gnu
+            apt: [gcc-mipsel-linux-gnu]
+            linker: mipsel-linux-gnu-gcc
+            runner: "qemu-mipsel -L /usr/mipsel-unknown-linux-gnu/"
+            nightly: true
+          - target: sparc64-unknown-linux-gnu
+            apt: [gcc-sparc64-linux-gnu]
+            linker: sparc64-linux-gnu-gcc
+            runner: "qemu-sparc64 -L /usr/sparc64-linux-gnu/"
+            nightly: true
+          - target: armv4t-unknown-linux-gnueabi
+            apt: [gcc-arm-linux-gnueabi]
+            linker: arm-linux-gnueabi-gcc
+            runner: "qemu-arm -L /usr/arm-linux-gnueabi/"
+            nightly: true
+
+    steps:
+      # v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        name: Checkout
+
+      # v2.3.0
+      - uses: msys2/setup-msys2@4f806de0a5a7294ffabaff804b38a9b435a73bda
+        name: Setup MSYS2
+        if: runner.os == 'Windows' && matrix.msys2 == true
+        with:
+          msystem: ${{ matrix.msys_env }}
+          install: ${{ join(matrix.msys2-packages, ' ') }}
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          toolchain: ${{ matrix.nightly && 'nightly' || inputs.rust-version }}
+          target: ${{ matrix.target }}
+          msys2: ${{ matrix.msys2 }}
+
+      - name: Install dependencies
+        if: matrix.apt
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user ${{ join(matrix.apt, ' ') }}
+
+        # v1.1.0
+      - uses: bytecodealliance/actions/wasmtime/setup@d742827944dcb656569399571a8a45261b5089f6
+        name: Setup WASM Runtime
+        if: matrix.wasm == true
+        with:
+          version: ${{ inputs.wasmtime-version }}
+
+      - name: Configure Cargo
+        if: runner.os == 'Linux'
+        run: |
+          T_UPPER=$(echo "${{ matrix.target }}" | tr '[:lower:]-' '[:upper:]_')
+          if [[ -n "${{ matrix.linker }}" ]]; then
+            echo "CARGO_TARGET_${T_UPPER}_LINKER=${{ matrix.linker }}" >> "${GITHUB_ENV}"
+          fi
+          if [[ -n "${{ matrix.runner }}" ]]; then
+            echo "CARGO_TARGET_${T_UPPER}_RUNNER=${{ matrix.runner }}" >> "${GITHUB_ENV}"
+          fi
+
+      - name: Run Test
+        if: runner.os == 'Windows' && matrix.msys2 == true
+        shell: msys2 {0}
+        run: cargo test --workspace --target "${{ matrix.target }}"
+
+      - name: Run Test
+        if: runner.os != 'Windows' && matrix.msys2 != true
+        shell: bash
+        run: |
+          if [[ -z "${{ matrix.nightly }}" ]]; then
+            cargo test --workspace --target "${{ matrix.target }}" --all-features
+          else
+            cargo test --workspace --target "${{ matrix.target }}" --all-features -Z build-std
+          fi

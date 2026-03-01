@@ -1,0 +1,27 @@
+name: CI
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - ".gitlab-ci.yml"
+      - ".gitlab/ci/**/*.yaml"
+      - ".cargo/config.toml"
+      - "Cargo.toml"
+      - "crate/**"
+      - "src/**"
+  pull_request:
+    branches: [ main ]
+    paths:
+      - ".gitlab-ci.yml"
+      - ".gitlab/ci/**/*.yaml"
+      - ".cargo/config.toml"
+      - "Cargo.toml"
+      - "crate/**"
+      - "src/**"
+
+jobs:
+  ci:
+    uses: ./.github/workflows/test.yml
+    with:
+      rust-version: "1.93.0"
+      wasmtime-version: "41.0.3"
